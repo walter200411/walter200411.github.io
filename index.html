@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zoom 3D Tarjetas Interactivas</title>
+  <style>
+    #starCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 998;
+  pointer-events: none;
+}
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: linear-gradient(135deg, #1a001a 0%, #2c0033 50%, #3a004d 100%);
+      font-family: arial,sans-serif;
+      cursor: none;
+    }
+    #loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at center, #3a004d, #1a001a);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      transition: opacity 1s ease;
+      user-select: none;
+    }
+    #loading-screen.fade-out {
+      opacity: 0;
+    }
+    #loading-screen span {
+      display: inline-block;
+      opacity: 0;
+      transform: scale(0.5) translateY(-20px);
+      filter: blur(6px);
+      margin: 0 2px;
+      transition: all 0.4s ease;
+      font-size: 2rem;
+      color: white;
+      text-shadow: 0 0 5px white;
+      font-family: 'Comic Sans MS', cursive;
+    }
+    #loading-screen span.visible {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      filter: blur(0);
+    }
+    .cursor-light {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(200, 100, 255, 0.3), transparent 60%);
+      pointer-events: none;
+      z-index: 999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.1s linear;
+    }
+    .click-ripple {
+      position: fixed;
+      width: 15px;
+      height: 15px;
+      border: 3px solid rgba(200, 100, 255, 0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 998;
+      transform: translate(-50%, -50%) scale(0.8);
+      animation: rippleWave 1s ease-out forwards;
+      opacity: 1;
+    }
+    .click-ripple.wave2 { animation-delay: 0.1s; }
+    .click-ripple.wave3 { animation-delay: 0.2s; }
+    @keyframes rippleWave {
+      0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.8); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(5); }
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="starCanvas"></canvas>
+
+<script>
+  const starCanvas = document.getElementById("starCanvas");
+  const ctx = starCanvas.getContext("2d");
+  let stars = [];
+
+  function resizeCanvas() {
+    starCanvas.width = window.innerWidth;
+    starCanvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas);
+
+  document.addEventListener("mousemove", (e) => {
+    for (let i = 0; i < 4; i++) {
+      stars.push({
+        x: e.clientX,
+        y: e.clientY,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        alpha: 1,
+        radius: Math.random() * 2 + 1,
+        life: 60 + Math.random() * 40
+      });
+    }
+  });
+
+  function animateStars() {
+    ctx.clearRect(0, 0, starCanvas.width, starCanvas.height);
+    for (let i = stars.length - 1; i >= 0; i--) {
+      let s = stars[i];
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 182, 255, ${s.alpha})`;
+      ctx.shadowColor = `rgba(255, 182, 255, ${s.alpha})`;
+      ctx.shadowBlur = 8;
+      ctx.fill();
+      s.x += s.vx;
+      s.y += s.vy;
+      s.alpha -= 0.01;
+      s.life--;
+      if (s.life <= 0 || s.alpha <= 0) stars.splice(i, 1);
+    }
+    requestAnimationFrame(animateStars);
+  }
+
+  animateStars();
+</script>
+
+  <div id="loading-screen"></div>
+  <div class="cursor-light" id="cursor"></div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <script>
+    let clicks = 10;
+    const mensajes = [
+      "PRESIONA 10 VECES PARA CONTINUAR",
+      "Vamos, solo te faltan 9...",
+      "¿Qué será? Solo faltan 8...",
+      "Estás preparada... faltan 7...",
+      "Sigue así, solo quedan 6...",
+      "¡Vamos! Ya casi, quedan 5...",
+      "Faltan 4... ¿te emociona?",
+      "Solo 3 más, ¿listo?",
+      "¡Últimos 2! ¿Qué pasará?",
+      "1 paso más y se revela...",
+      "¡Completado!"
+    ];
+    const loading = document.getElementById('loading-screen');
+    const cursor = document.getElementById('cursor');
+
+    function animateText(text) {
+      loading.innerHTML = text.split("").map((letra, i) =>
+        `<span style="transition-delay:${i * 70}ms">${letra}</span>`).join("");
+      setTimeout(() => {
+        loading.querySelectorAll("span").forEach(span => span.classList.add("visible"));
+      }, 10);
+    }
+
+    animateText(mensajes[0]);
+
+    loading.addEventListener('click', (e) => {
+      createRipple(e.clientX, e.clientY);
+      clicks--;
+      if (clicks >= 0) animateText(mensajes[10 - clicks]);
+      if (clicks === 0) {
+        loading.classList.add("fade-out");
+        loading.style.pointerEvents = 'none';
+        setTimeout(() => {
+          loading.remove();
+          initScene();
+        }, 1000);
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      cursor.style.left = `${e.clientX}px`;
+      cursor.style.top = `${e.clientY}px`;
+    });
+
+    function createRipple(x, y) {
+      for (let i = 1; i <= 3; i++) {
+        const ripple = document.createElement('div');
+        ripple.className = 'click-ripple';
+        if (i === 2) ripple.classList.add('wave2');
+        if (i === 3) ripple.classList.add('wave3');
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+        document.body.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 1000);
+      }
+    }
+
+// Código actualizado sin rosas, pero con explosión fuerte y dispersión
+function initScene() {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  const spot = new THREE.SpotLight(0xff99cc, 1);
+  spot.position.set(0, 5, 10);
+  scene.add(ambient, spot);
+
+  // Fondo de partículas globales
+  const particleGeometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(500 * 3);
+  for (let i = 0; i < positions.length; i++) {
+    positions[i] = (Math.random() - 0.5) * 20;
+  }
+  particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const particleMaterial = new THREE.PointsMaterial({ color: 0xffccff, size: 0.05 });
+  const particles = new THREE.Points(particleGeometry, particleMaterial);
+  scene.add(particles);
+
+  const cards = [];
+  const frases = [
+    "Una prueba injusta no borra tu talento, ni apaga tu vocación. No te rindas, porque ni un mal puede frenar a una mujer hecha para dejar huella en el mundo."
+    , "Como una arquitecta que esculpe ciudades, también estás construyendo una vida que solo tú puedes diseñar: única, valiente y llena de propósito"
+    , "Hay quienes saborean el sushi por su sabor, pero tú lo haces por la experiencia: porque aprecias los detalles, lo exótico y lo que pocos se atreven a probar."
+    , "Eres como el café fuerte por la mañana: auténtica, intensa, y capaz de despertar hasta los sueños dormidos.Excepto cuando aplicas 5 minutos más XD"
+    , "El color morado te representa: creatividad, misterio y una elegancia que no necesita explicación, solo admiración",
+    "Dicen que viajar te cambia la vida, pero viajar contigo seguro también cambia las reglas del GPS", 
+    "Si los profesores malos fueran villanos, ya tendrías recompensa en carteles: ‘Se busca por diseñar planos tan buenos que dan envidia’",
+    "Tu sonrisa es como el Sunny en medio del mar, aparece y todos se olvidan del clima feo", 
+    "Eres tan ordenada que ni Zoro se perdería contigo, y eso que se pierde hasta en línea recta",
+    "Eres esa mezcla perfecta entre adrenalina y equilibrio. Como una estructura bien pensada, sólida pero con espacio para soñar con altura."
+  ];
+  const videoSources = [
+    "video1.mp4", "video2.mp4", "video3.mp4", "video4.mp4", "video5.mp4",
+    "video6.mp4", "video7.mp4", "video8.mp4", "video9.mp4", "video10.mp4"
+  ];
+
+
+  for (let i = 0; i < 10; i++) {
+  const x = i % 2 === 0 ? -3 : 3;
+  const z = -i * 5;
+
+  const video = document.createElement("video");
+  video.src = videoSources[i];
+  video.muted = true;
+  video.loop = true;
+  video.autoplay = true;
+  video.playsInline = true;
+  video.style.display = "none";
+  document.body.appendChild(video);
+  video.play();
+
+  const videoTexture = new THREE.VideoTexture(video);
+  const material = new THREE.MeshBasicMaterial({
+    map: videoTexture,
+    side: THREE.DoubleSide,
+    transparent: true
+  });
+  material.opacity = i === 0 ? 1 : 0.2;
+
+  const geometry = new THREE.PlaneGeometry(3, 1.5);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(x, 0, z);
+  mesh.userData.target = { x, z };
+  scene.add(mesh);
+  cards.push(mesh);
+
+  gsap.from(mesh.scale, {
+    x: 0,
+    y: 0,
+    z: 0,
+    duration: 1,
+    delay: i * 0.2,
+    ease: "back.out(1.7)"
+  });
+
+  gsap.to(mesh.position, {
+    y: "+=0.2",
+    duration: 2 + Math.random(),
+    repeat: -1,
+    yoyo: true,
+    ease: "sine.inOut"
+  });
+
+  // ==== DIBUJAR FRASE ADAPTADA ====
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+
+ // Fondo con borde redondeado tipo viñeta
+ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+ctx.strokeStyle = "#ff99ff";  // Borde rosado claro
+ctx.lineWidth = 4;
+const radius = 20;
+const w = canvas.width;
+const h = canvas.height;
+
+ctx.beginPath();
+ctx.moveTo(radius, 0);
+ctx.lineTo(w - radius, 0);
+ctx.quadraticCurveTo(w, 0, w, radius);
+ctx.lineTo(w, h - radius);
+ctx.quadraticCurveTo(w, h, w - radius, h);
+ctx.lineTo(radius, h);
+ctx.quadraticCurveTo(0, h, 0, h - radius);
+ctx.lineTo(0, radius);
+ctx.quadraticCurveTo(0, 0, radius, 0);
+ctx.closePath();
+
+ctx.fill();
+ctx.stroke();
+
+
+  ctx.fillStyle = "#ffffff";
+ctx.textAlign = "center";
+ctx.textBaseline = "middle";
+ctx.shadowColor = "#ff66ff";  // sombra rosa clara
+ctx.shadowBlur = 6;          // sombra más brillante
+
+
+  const maxWidth = canvas.width - 60;
+  const lineHeight = 36;
+  let fontSize = 36;
+  ctx.font = `bold ${fontSize}px Sans-serif`;
+
+  const words = frases[i].split(" ");
+  let lines = [];
+  let currentLine = words[0];
+
+  for (let j = 1; j < words.length; j++) {
+    const word = words[j];
+    const width = ctx.measureText(currentLine + " " + word).width;
+    if (width < maxWidth) {
+      currentLine += " " + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  lines.push(currentLine);
+
+  while (lines.length * lineHeight > canvas.height - 40 && fontSize > 14) {
+    fontSize -= 2;
+    ctx.font = `bold ${fontSize}px Sans-serif`;
+    lines = [];
+    currentLine = words[0];
+    for (let j = 1; j < words.length; j++) {
+      const word = words[j];
+      const width = ctx.measureText(currentLine + " " + word).width;
+      if (width < maxWidth) {
+        currentLine += " " + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    lines.push(currentLine);
+  }
+
+  const totalHeight = lines.length * lineHeight;
+  let y = (canvas.height - totalHeight) / 2 + lineHeight / 2;
+  for (const line of lines) {
+    ctx.fillText(line, canvas.width / 2, y);
+    y += lineHeight;
+  }
+
+  const textTexture = new THREE.CanvasTexture(canvas);
+  const textMaterial = new THREE.MeshBasicMaterial({ map: textTexture, transparent: true });
+  const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(3, 1.5), textMaterial);
+  textPlane.position.set(0, 0, 0.01);
+  mesh.add(textPlane);
+
+  const localParticlesGeo = new THREE.BufferGeometry();
+  const count = 100;
+  const localPositions = new Float32Array(count * 3);
+  const targetPositions = [];
+  for (let j = 0; j < count; j++) {
+    const tx = (Math.random() - 0.5) * 10;
+    const ty = (Math.random() - 0.5) * 6;
+    const tz = (Math.random() - 0.5) * 1;
+    localPositions[j * 3 + 0] = 0;
+    localPositions[j * 3 + 1] = 0;
+    localPositions[j * 3 + 2] = 0;
+    targetPositions.push({ x: tx, y: ty, z: tz });
+  }
+  localParticlesGeo.setAttribute('position', new THREE.BufferAttribute(localPositions, 3));
+  const localParticlesMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.05, transparent: true, opacity: 0.6 });
+  const localParticles = new THREE.Points(localParticlesGeo, localParticlesMat);
+  localParticles.position.set(x, 0, z - 0.05);
+  scene.add(localParticles);
+  mesh.userData.particleEffect = localParticles;
+  mesh.userData.targetPositions = targetPositions;
+}
+
+
+  function animateParticles(mesh) {
+    const localParticles = mesh.userData.particleEffect;
+    const attr = localParticles.geometry.getAttribute('position');
+    const targets = mesh.userData.targetPositions;
+    for (let j = 0; j < targets.length; j++) {
+      attr.array[j * 3 + 0] = 0;
+      attr.array[j * 3 + 1] = 0;
+      attr.array[j * 3 + 2] = 0;
+    }
+    attr.needsUpdate = true;
+    for (let j = 0; j < targets.length; j++) {
+      const finalX = targets[j].x * 1.2;
+      const finalY = targets[j].y * 1.2;
+      const finalZ = targets[j].z * 1.2;
+      gsap.to(attr.array, {
+        [j * 3 + 0]: finalX,
+        [j * 3 + 1]: finalY,
+        [j * 3 + 2]: finalZ,
+        duration: 1.2,
+        ease: "expo.out",
+        onUpdate: () => attr.needsUpdate = true,
+        onComplete: () => {
+          gsap.to(attr.array, {
+            [j * 3 + 0]: finalX * 1.5,
+            [j * 3 + 1]: finalY * 1.5,
+            [j * 3 + 2]: finalZ * 1.5,
+            duration: 2,
+            ease: "sine.out",
+            onUpdate: () => attr.needsUpdate = true
+          });
+        }
+      });
+    }
+  }
+
+  camera.position.set(cards[0].userData.target.x, 0, 5);
+  let current = 0;
+  animateParticles(cards[0]);
+
+  function animateCamera() {
+    const target = cards[current].userData.target;
+    gsap.to(camera.position, {
+      x: target.x,
+      z: target.z + 5,
+      duration: 1,
+      ease: "power2.inOut"
+    });
+
+    cards.forEach((card, i) => {
+      const opacity = i === current ? 1 : i === current + 1 ? 0.4 : i === current + 2 ? 0.1 : 0.05;
+      gsap.to(card.material, {
+        opacity,
+        duration: 0.6,
+        ease: "sine.out"
+      });
+
+      const scale = i === current ? 1.2 : 1;
+      gsap.to(card.scale, {
+        x: scale,
+        y: scale,
+        duration: 0.6,
+        ease: "expo.out"
+      });
+
+      const p = card.userData.particleEffect;
+      if (p) {
+        p.visible = (i === current);
+        if (i === current) animateParticles(card);
+      }
+    });
+  }
+
+  document.addEventListener("click", () => {
+    if (current < cards.length - 1) {
+      current++;
+      animateCamera();
+    }
+  });
+
+  function animate() {
+    requestAnimationFrame(animate);
+    particles.rotation.y += 0.0005;
+    renderer.render(scene, camera);
+  }
+
+  animate();
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+  
+  
+}
+// Reproducir música al finalizar la pantalla de carga
+const audio = document.createElement("audio");
+audio.src = "musica.mp3";
+audio.loop = true;
+audio.autoplay = true;
+audio.style.display = "none";
+document.body.appendChild(audio);
+
+// Dentro del if (clicks === 0), donde ya se llama a initScene:
+if (clicks === 0) {
+  loading.classList.add("fade-out");
+  loading.style.pointerEvents = 'none';
+  
+  // Reproducir música justo al iniciar la escena
+  audio.play().catch(e => {
+    console.warn("No se pudo reproducir la música automáticamente:", e);
+  });
+
+  setTimeout(() => {
+    loading.remove();
+    initScene();
+  }, 1000);
+}
+
+
+  </script>
+</body>
+</html>
