@@ -90,10 +90,30 @@
     }
   </style>
 </head>
+
 <body>
   <canvas id="starCanvas"></canvas>
 
 <script>
+  
+   const audio = document.createElement("audio");
+    audio.src = "musica.mp3"; // Cambia por tu archivo real si tiene otro nombre
+    audio.loop = true;
+    audio.style.display = "none";
+    document.body.appendChild(audio);
+
+    // 2. Variable bandera para que no se active dos veces
+    let musicaActivada = false;
+
+     // 3. Evento global: el PRIMER click en cualquier parte activa la música
+    document.addEventListener('click', function activarMusica() {
+      if (!musicaActivada) {
+        audio.play().catch(err => alert("No se pudo reproducir la música: " + err));
+        musicaActivada = true;
+      }
+      // Si solo quieres activarlo una vez, puedes remover el listener:
+      document.removeEventListener('click', activarMusica);
+    });
   const starCanvas = document.getElementById("starCanvas");
   const ctx = starCanvas.getContext("2d");
   let stars = [];
@@ -501,31 +521,6 @@ ctx.shadowBlur = 6;          // sombra más brillante
   
   
 }
-// Reproducir música al finalizar la pantalla de carga
-const audio = document.createElement("audio");
-audio.src = "musica.mp3";
-audio.loop = true;
-audio.autoplay = true;
-audio.style.display = "none";
-document.body.appendChild(audio);
-
-// Dentro del if (clicks === 0), donde ya se llama a initScene:
-if (clicks === 0) {
-  loading.classList.add("fade-out");
-  loading.style.pointerEvents = 'none';
-  
-  // Reproducir música justo al iniciar la escena
-  audio.play().catch(e => {
-    console.warn("No se pudo reproducir la música automáticamente:", e);
-  });
-
-  setTimeout(() => {
-    loading.remove();
-    initScene();
-  }, 1000);
-}
-
-
   </script>
 </body>
 </html>
